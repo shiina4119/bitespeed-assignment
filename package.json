@@ -1,0 +1,19 @@
+{
+  "name": "bitespeed-assignment",
+  "version": "1.0.0",
+  "description": "Bitespeed Backend Task",
+  "main": "src/app.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shiina4119/bitespeed-assignment.git"
+  },
+  "author": "Debanga Sarma",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shiina4119/bitespeed-assignment/issues"
+  },
+  "homepage": "https://github.com/shiina4119/bitespeed-assignment#readme"
+}
