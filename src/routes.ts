@@ -11,208 +11,263 @@ router.get("/", (_, res) => {
   res.send("Hello world!");
 });
 
+function log(request: identifyRequest, message: string) {
+  console.log(request);
+  console.log(message);
+}
+
 router.post("/identify", async (req: Request, res: Response) => {
   const request: identifyRequest = req.body;
   if (request.email == undefined) {
     request.email = null;
   }
   if (request.phoneNumber == undefined) {
-    request.email = null;
+    request.phoneNumber = null;
   }
+
+  /*
+
+  check for duplicate
+  check for 2 primary rows
+  
+  */
 
   if (!request.email && !request.phoneNumber) {
     res.json({ error: "Either phone number or email must be provided" });
+    return;
   }
 
   let response: identifyResponse;
 
-  const matchingRows = await db
+  let rows = await db
     .select()
     .from(contactTable)
     .where(
-      or(
-        eq(contactTable.phoneNumber, request.phoneNumber),
+      and(
         eq(contactTable.email, request.email),
+        eq(contactTable.phoneNumber, request.phoneNumber),
       ),
     );
 
-  if (!matchingRows.length) {
-    console.log("New record!!!");
-    const id = await addNewContact(request.phoneNumber, request.email);
-    response = {
-      primaryContactId: id,
-      emails: request.email ? [request.email] : [],
-      phoneNumbers: request.phoneNumber ? [request.phoneNumber] : [],
-      secondaryContactIds: [],
-    };
-    res.json({ contact: response });
-    return;
-  }
+  // check for duplicates
+  if (rows.length) {
+    log(request, "duplicate");
+    let primaryId = rows[0].linkedId != null ? rows[0].linkedId : rows[0].id;
+    rows = await db
+      .select()
+      .from(contactTable)
+      .where(
+        or(
+          eq(contactTable.id, primaryId),
+          eq(contactTable.linkedId, primaryId),
+        ),
+      );
 
-  let newEntry = true; // to check if entry is duplicate
-  let primaryId: number = -1;
-  let disgraceId: number = -1;
-  const emails: string[] = [];
-  const phoneNumbers: string[] = [];
-  const secondaryIds: number[] = [];
-  for (const row of matchingRows) {
-    if (row.email == request.email && row.phoneNumber == request.phoneNumber) {
-      newEntry = false;
-    }
-    if (row.linkPrecedence == "primary") {
-      if (primaryId == -1) {
-        primaryId = row.id;
-      } else {
-        disgraceId = row.id;
+    const emails = new Set<string>();
+    const phoneNumbers = new Set<string>();
+    const secondaryIds: number[] = [];
+
+    for (const row of rows) {
+      if (row.linkedId) {
+        secondaryIds.push(row.id);
       }
-    } else {
-      secondaryIds.push(row.id);
+      if (row.email) {
+        emails.add(row.email);
+      }
+      if (row.phoneNumber) {
+        phoneNumbers.add(row.phoneNumber);
+      }
     }
-    if (row.email) {
-      emails.push(row.email);
-    }
-    if (row.phoneNumber) {
-      phoneNumbers.push(row.phoneNumber);
-    }
-  }
-
-  if (!newEntry) {
-    console.log("Duplicate entry :(");
     response = {
       primaryContactId: primaryId,
-      emails: emails,
-      phoneNumbers: phoneNumbers,
+      emails: Array.from(emails.values()),
+      phoneNumbers: Array.from(phoneNumbers.values()),
       secondaryContactIds: secondaryIds,
     };
-    res.json({ contact: response });
+    res.json(response);
     return;
   }
 
-  if (disgraceId != -1) {
-    console.log("Multiple primary IDs");
-    let p1 = db
-      .update(contactTable)
-      .set({ linkedId: primaryId })
-      .where(eq(contactTable.linkedId, disgraceId));
+  let primaryRowsPromise = db
+    .select()
+    .from(contactTable)
+    .where(
+      and(
+        or(
+          eq(contactTable.email, request.email),
+          eq(contactTable.phoneNumber, request.phoneNumber),
+        ),
+        eq(contactTable.linkPrecedence, "primary"),
+      ),
+    );
 
-    let p2 = db
-      .update(contactTable)
-      .set({ linkedId: primaryId, linkPrecedence: "secondary" })
-      .where(eq(contactTable.id, disgraceId));
+  let secondaryRowsPromise = db
+    .select()
+    .from(contactTable)
+    .where(
+      and(
+        or(
+          eq(contactTable.email, request.email),
+          eq(contactTable.phoneNumber, request.phoneNumber),
+        ),
+        eq(contactTable.linkPrecedence, "secondary"),
+      ),
+    );
 
-    await Promise.all([p1, p2]);
+  let [primaryRows, secondaryRows] = await Promise.all([
+    primaryRowsPromise,
+    secondaryRowsPromise,
+  ]);
 
-    secondaryIds.push(disgraceId);
-  } else {
-    console.log("Secondary new record");
+  if (!primaryRows.length) {
+    if (secondaryRows.length) {
+      log(request, "new secondary record");
+      let idPromise = addNewContact(
+        request.phoneNumber,
+        request.email,
+        secondaryRows[0].linkedId,
+      );
+      let primaryRowPromise = db
+        .select()
+        .from(contactTable)
+        .where(eq(contactTable.id, secondaryRows[0].linkedId));
+
+      const [id, primaryRow] = await Promise.all([
+        idPromise,
+        primaryRowPromise,
+      ]);
+      let emails = new Set<string>();
+      if (primaryRow[0].email) {
+        emails.add(primaryRow[0].email);
+      }
+      let phoneNumbers = new Set<string>();
+      if (primaryRow[0].phoneNumber) {
+        phoneNumbers.add(primaryRow[0].phoneNumber);
+      }
+      let secondaryIds = [];
+      for (let row of secondaryRows) {
+        secondaryIds.push(row.id);
+        if (row.email) {
+          emails.add(row.email);
+        }
+        let phoneNumbers = new Set<string>();
+        if (row.phoneNumber) {
+          phoneNumbers.add(row.phoneNumber);
+        }
+      }
+
+      response = {
+        primaryContactId: primaryRow[0].id,
+        emails: Array.from(emails.values()),
+        phoneNumbers: Array.from(phoneNumbers.values()),
+        secondaryContactIds: secondaryIds,
+      };
+      res.json(response);
+    } else {
+      // new primary record
+      log(request, "new primary record");
+      const id = await addNewContact(request.phoneNumber, request.email);
+      const emails = new Set<string>();
+      if (request.email) {
+        emails.add(request.email);
+      }
+      const phoneNumbers = new Set<string>();
+      if (request.phoneNumber) {
+        phoneNumbers.add(request.phoneNumber);
+      }
+
+      response = {
+        primaryContactId: id,
+        emails: Array.from(emails.values()),
+        phoneNumbers: Array.from(phoneNumbers.values()),
+        secondaryContactIds: [],
+      };
+    }
+  } else if (primaryRows.length == 1) {
+    // new secondary record
+    log(request, "new secondary record");
+    const emails = new Set<string>();
+    if (primaryRows[0].email) {
+      emails.add(primaryRows[0].email);
+    }
+    const phoneNumbers = new Set<string>();
+    if (primaryRows[0].phoneNumber) {
+      phoneNumbers.add(primaryRows[0].phoneNumber);
+    }
     const id = await addNewContact(
       request.phoneNumber,
       request.email,
-      primaryId,
+      primaryRows[0].id,
     );
-    secondaryIds.push(id);
-    if (request.email && !emails.includes(request.email)) {
-      emails.push(request.email);
+    const secondaryIds = [id];
+    for (const row of secondaryRows) {
+      secondaryIds.push(row.id);
+      if (row.email) {
+        emails.add(row.email);
+      }
+      if (row.phoneNumber) {
+        phoneNumbers.add(row.phoneNumber);
+      }
     }
-    if (request.phoneNumber && !phoneNumbers.includes(request.phoneNumber)) {
-      phoneNumbers.push(request.phoneNumber);
+
+    response = {
+      primaryContactId: primaryRows[0].id,
+      emails: Array.from(emails.values()),
+      phoneNumbers: Array.from(phoneNumbers.values()),
+      secondaryContactIds: secondaryIds,
+    };
+  } else {
+    // multiple primary records
+    log(request, "multiple primary records");
+    let p1 = db
+      .update(contactTable)
+      .set({ linkedId: primaryRows[0].id })
+      .where(eq(contactTable.linkedId, primaryRows[1].id));
+
+    let p2 = db
+      .update(contactTable)
+      .set({ linkedId: primaryRows[0].id, linkPrecedence: "secondary" })
+      .where(eq(contactTable.id, primaryRows[1].id));
+
+    await Promise.all([p1, p2]);
+
+    let rows = await db
+      .select()
+      .from(contactTable)
+      .where(
+        or(
+          eq(contactTable.id, primaryRows[0].id),
+          eq(contactTable.linkedId, primaryRows[0].id),
+        ),
+      );
+
+    let primaryId = -1;
+    const emails = new Set<string>();
+    const phoneNumbers = new Set<string>();
+    const secondaryIds = [];
+    for (const row of rows) {
+      if (!row.linkedId == null) {
+        primaryId = row.id;
+      } else {
+        secondaryIds.push(row.id);
+      }
+      if (row.email) {
+        emails.add(row.email);
+      }
+      if (row.phoneNumber) {
+        phoneNumbers.add(row.phoneNumber);
+      }
     }
+
+    response = {
+      primaryContactId: primaryId,
+      emails: Array.from(emails.values()),
+      phoneNumbers: Array.from(phoneNumbers.values()),
+      secondaryContactIds: secondaryIds,
+    };
   }
 
-  response = {
-    primaryContactId: primaryId,
-    emails: emails,
-    phoneNumbers: phoneNumbers,
-    secondaryContactIds: secondaryIds,
-  };
-  res.json({ contact: response });
-  // const primaryRows = await db
-  //   .select()
-  //   .from(contactTable)
-  //   .where(
-  //     and(
-  //       or(
-  //         eq(contactTable.phoneNumber, request.phoneNumber),
-  //         eq(contactTable.email, request.email),
-  //       ),
-  //       eq(contactTable.linkPrecedence, "primary"),
-  //     ),
-  //   );
-
-  // if (!primaryRows.length) {
-  //   // create new record
-  //   console.log("Creating new primary row.");
-  //   const id = await addNewContact(request.phoneNumber, request.email);
-  //   const response: identifyResponse = {
-  //     primaryContactId: id,
-  //     emails: request.email ? [request.email] : [],
-  //     phoneNumbers: request.phoneNumber ? [request.phoneNumber] : [],
-  //     secondaryContactIds: [],
-  //   };
-  //   res.json(response);
-  // } else if (primaryRows.length == 1) {
-  //   const prow = primaryRows[0];
-
-  //   let response: identifyResponse;
-  //   // check if both number and email are the same
-  //   if (
-  //     prow.email == request.email &&
-  //     prow.phoneNumber == request.phoneNumber
-  //   ) {
-  //     console.log("Both phone number and email are the same.");
-  //     response = {
-  //       primaryContactId: prow.id,
-  //       emails: prow.email ? [prow.email] : [],
-  //       phoneNumbers: prow.phoneNumber ? [prow.phoneNumber] : [],
-  //       secondaryContactIds: [],
-  //     };
-  //   } else {
-  //     const sec
-
-  //     const secondaryRows = await db
-  //       .select()
-  //       .from(contactTable)
-  //       .where(
-  //         and(
-  //           eq(contactTable.linkedId, prow.id),
-  //           and(
-  //             not(eq(contactTable.email, request.email)),
-  //             not(eq(contactTable.phoneNumber, request.phoneNumber))
-  //           ),
-  //         ),
-  //       );
-
-  //     // add new row with new info
-  //     console.log("Creating new secondary row.");
-  //     const id = await addNewContact(
-  //       request.phoneNumber,
-  //       request.email,
-  //       prow.id,
-  //     );
-
-  //     const emails: string[] = [];
-  //     const phoneNumbers: string[] = [];
-  //     const secondaryContactIds: number[] = [];
-
-  //     for (const srow of secondaryRows) {
-  //       console.log(srow);
-  //       if (srow.email) {
-  //         emails.push(srow.email);
-  //       }
-  //       if (srow.phoneNumber) {
-  //         phoneNumbers.push(srow.phoneNumber);
-  //       }
-  //       secondaryContactIds.push(srow.id);
-  //     }
-  //     response = {
-  //       primaryContactId: prow.id,
-  //       emails: emails,
-  //       phoneNumbers: phoneNumbers,
-  //       secondaryContactIds: secondaryContactIds,
-  //     };
-  //     response.secondaryContactIds.push(id);
-  //   }
-  //   res.json(response);
+  res.json(response);
 });
 
 export default router;
