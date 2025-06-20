@@ -23,11 +23,11 @@ import {
 export const roleEnum = pgEnum("role", ["primary", "secondary"]);
 
 export const contactTable = pgTable("Contact", {
-  id: serial("id"),
+  id: serial("id").primaryKey(),
   phoneNumber: text("phoneNumber"),
   email: text("email"),
   linkedId: integer("linkedId"),
-  linkPrecedence: roleEnum("role"),
+  linkPrecedence: roleEnum("linkPrecedence"),
   createdAt: date("createdAt").notNull(),
   updatedAt: date("updatedAt").notNull(),
   deletedAt: date("deletedAt"),
