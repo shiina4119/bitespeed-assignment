@@ -44,8 +44,8 @@ router.post("/identify", async (req: Request, res: Response) => {
     .from(contactTable)
     .where(
       and(
-        eq(contactTable.email, request.email),
-        eq(contactTable.phoneNumber, request.phoneNumber),
+        eq(contactTable.email, request.email!),
+        eq(contactTable.phoneNumber, request.phoneNumber!),
       ),
     );
 
@@ -94,8 +94,8 @@ router.post("/identify", async (req: Request, res: Response) => {
     .where(
       and(
         or(
-          eq(contactTable.email, request.email),
-          eq(contactTable.phoneNumber, request.phoneNumber),
+          eq(contactTable.email, request.email!),
+          eq(contactTable.phoneNumber, request.phoneNumber!),
         ),
         eq(contactTable.linkPrecedence, "primary"),
       ),
@@ -107,8 +107,8 @@ router.post("/identify", async (req: Request, res: Response) => {
     .where(
       and(
         or(
-          eq(contactTable.email, request.email),
-          eq(contactTable.phoneNumber, request.phoneNumber),
+          eq(contactTable.email, request.email!),
+          eq(contactTable.phoneNumber, request.phoneNumber!),
         ),
         eq(contactTable.linkPrecedence, "secondary"),
       ),
@@ -130,7 +130,7 @@ router.post("/identify", async (req: Request, res: Response) => {
       let primaryRowPromise = db
         .select()
         .from(contactTable)
-        .where(eq(contactTable.id, secondaryRows[0].linkedId));
+        .where(eq(contactTable.id, secondaryRows[0].linkedId!));
 
       const [id, primaryRow] = await Promise.all([
         idPromise,
