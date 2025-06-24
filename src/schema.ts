@@ -14,12 +14,12 @@ import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 */
 
 export const contacts = pgTable("Contact", {
-  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-  phoneNumber: text("phoneNumber"),
-  email: text("email"),
-  linkedId: integer("linkedId"),
-  linkPrecedence: text("linkPrecedence", { enum: ["primary", "secondary"] }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-  deletedAt: timestamp("deletedAt"),
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    phoneNumber: text("phoneNumber"),
+    email: text("email"),
+    linkedId: integer("linkedId"),
+    linkPrecedence: text("linkPrecedence", { enum: ["primary", "secondary"] }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    deletedAt: timestamp("deletedAt"),
 });

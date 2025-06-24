@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'tsx' src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "format": "prettier --write 'src/**/*.ts' --parser typescript"
   },
   "repository": {
     "type": "git",
