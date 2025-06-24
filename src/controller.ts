@@ -145,3 +145,12 @@ export const handleIdentifyRoute = async (req: Request, res: Response) => {
 
     res.json(response);
 };
+
+export const fetchAllRows = async (req: Request, res: Response) => {
+    const rows = await db.select().from(contacts);
+    const response = new Array<Contact>();
+    for (const row of rows) {
+        response.push(row);
+    }
+    res.json(response);
+};
