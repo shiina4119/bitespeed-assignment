@@ -1,6 +1,6 @@
 # Bitespeed Backend Task: Identity Reconciliation
 
-An express.js app written in typescript.
+An express.js app written in typescript.\
 Postgres was selected as the database and drizzle ORM is used for DB operations.
 
 ## How to use
@@ -18,4 +18,6 @@ POST `/identify` returns a response of the following format
 }
 ```
 
-GET `/all` will return a JSON array containing all the records stored in the database
+GET `/all` will return a JSON array containing all the records stored in the database.
+
+GET `/clear` will delete all rows in the database.
