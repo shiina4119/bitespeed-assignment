@@ -1,0 +1,43 @@
+{
+  "name": "bitespeed-assignment",
+  "version": "1.0.0",
+  "description": "Bitespeed Assignment: Identity Reconciliation Task",
+  "scripts": {
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'tsx' src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shiina4119/bitespeed-assignment.git"
+  },
+  "keywords": [
+    "node.js",
+    "express",
+    "typescript",
+    "orm",
+    "prisma-orm",
+    "prisma"
+  ],
+  "author": "Debanga Sarma",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shiina4119/bitespeed-assignment/issues"
+  },
+  "homepage": "https://github.com/shiina4119/bitespeed-assignment#readme",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.44.2",
+    "express": "^5.1.0",
+    "pg": "^8.16.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.3",
+    "@types/pg": "^8.15.4",
+    "drizzle-kit": "^0.31.2",
+    "nodemon": "^3.1.10",
+    "tsx": "^4.20.3"
+  },
+  "type": "module"
+}
